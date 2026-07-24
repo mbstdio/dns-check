@@ -130,22 +130,27 @@ function matchesExpectedValue(result: unknown, expectedValue: string): boolean {
   return values.some((value) => formatDnsValue(value) === expectedValue);
 }
 
-function printTable(headers: string[], rows: string[][]): void {
+function tableLayout(headers: string[]): { widths: number[]; border: (left: string, middle: string, right: string) => string; formatLine: (cells: string[]) => string } {
   const responseWidth = Math.max(24, Math.min(52, (process.stdout.columns ?? 120) - 82));
   const columnLimits = [34, 15, 10, 10, responseWidth];
-  const widths = headers.map((header, column) => Math.min(columnLimits[column], Math.max(header.length, ...rows.map((row) => row[column].length))));
+  const widths = headers.map((header, column) => Math.max(header.length, columnLimits[column]));
   const border = (left: string, middle: string, right: string) => `${left}${widths.map((width) => "─".repeat(width + 2)).join(middle)}${right}`;
   const formatLine = (cells: string[]) => `│ ${cells.map((cell, column) => cell.padEnd(widths[column])).join(" │ ")} │`;
+  return { widths, border, formatLine };
+}
 
-  console.log(border("╭", "┬", "╮"));
-  console.log(formatLine(headers));
-  console.log(border("├", "┼", "┤"));
-  for (const row of rows) {
-    const cells = row.map((cell, column) => wrapCell(cell, widths[column]));
-    const height = Math.max(...cells.map((cell) => cell.length));
-    for (let line = 0; line < height; line++) console.log(formatLine(cells.map((cell) => cell[line] ?? "")));
-  }
-  console.log(border("╰", "┴", "╯"));
+function printTableHeader(headers: string[]): ReturnType<typeof tableLayout> {
+  const layout = tableLayout(headers);
+  console.log(layout.border("╭", "┬", "╮"));
+  console.log(layout.formatLine(headers));
+  console.log(layout.border("├", "┼", "┤"));
+  return layout;
+}
+
+function printTableRow(layout: ReturnType<typeof tableLayout>, row: string[]): void {
+  const cells = row.map((cell, column) => wrapCell(cell, layout.widths[column]));
+  const height = Math.max(...cells.map((cell) => cell.length));
+  for (let line = 0; line < height; line++) console.log(layout.formatLine(cells.map((cell) => cell[line] ?? "")));
 }
 
 async function lookup(domain: string, recordType: string, expectedValue?: string): Promise<void> {
@@ -154,7 +159,8 @@ async function lookup(domain: string, recordType: string, expectedValue?: string
   const resolvers = [...DEFAULT_RESOLVERS, ...await customResolvers()];
   console.log(`\nRésolution DNS · ${recordType.toUpperCase()} · ${domain}${expectedValue === undefined ? "" : ` · valeur attendue : ${expectedValue}`}`);
   console.log(`${resolvers.length} résolveur(s) interrogé(s)\n`);
-  const results = await Promise.all(resolvers.map(async ({ name, ip }): Promise<LookupResult> => {
+  const layout = printTableHeader(["Résolveur", "IP", "Délai", "Statut", "Réponse DNS"]);
+  await Promise.all(resolvers.map(async ({ name, ip }): Promise<LookupResult> => {
     const resolver = new Resolver();
     resolver.setServers([ip]);
     const startedAt = performance.now();
@@ -172,11 +178,11 @@ async function lookup(domain: string, recordType: string, expectedValue?: string
       process.exitCode = 2;
       return { name, ip, elapsed: Math.round(performance.now() - startedAt), status: "✗ Échec", response: message };
     }
-  }));
-  printTable(
-    ["Résolveur", "IP", "Délai", "Statut", "Réponse DNS"],
-    results.map(({ name, ip, elapsed, status, response }) => [name, ip, `${elapsed} ms`, status, response]),
-  );
+  }).map((promise) => promise.then((result) => {
+    printTableRow(layout, [result.name, result.ip, `${result.elapsed} ms`, result.status, result.response]);
+    return result;
+  })));
+  console.log(layout.border("╰", "┴", "╯"));
 }
 
 async function main(): Promise<void> {
