@@ -1,0 +1,29 @@
+{
+  "name": "dns-check",
+  "version": "1.0.0",
+  "description": "Compare DNS records across multiple resolvers from the terminal.",
+  "license": "MIT",
+  "type": "module",
+  "bin": {
+    "dns-check": "./dist/index.js"
+  },
+  "files": [
+    "dist",
+    "README.md",
+    "LICENSE"
+  ],
+  "scripts": {
+    "build": "tsc",
+    "start": "node dist/index.js",
+    "dev": "tsx src/index.ts",
+    "prepublishOnly": "npm run build"
+  },
+  "engines": {
+    "node": ">=18"
+  },
+  "devDependencies": {
+    "@types/node": "^22.15.3",
+    "tsx": "^4.19.3",
+    "typescript": "^5.8.3"
+  }
+}
