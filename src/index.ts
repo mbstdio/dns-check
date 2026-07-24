@@ -8,7 +8,7 @@ import { isIP } from "node:net";
 
 type RecordType = keyof Pick<Resolver, "resolve4" | "resolve6" | "resolveCaa" | "resolveCname" | "resolveMx" | "resolveNaptr" | "resolveNs" | "resolvePtr" | "resolveSoa" | "resolveSrv" | "resolveTxt">;
 type ResolverDefinition = { name: string; ip: string };
-type LookupResult = ResolverDefinition & { elapsed: number; status: "OK" | "ERREUR"; response: string };
+type LookupResult = ResolverDefinition & { elapsed: number; status: "✓ OK" | "✗ Échec"; response: string };
 
 const DEFAULT_RESOLVERS: ResolverDefinition[] = [
   { name: "Google", ip: "8.8.8.8" },
@@ -21,6 +21,8 @@ const DEFAULT_RESOLVERS: ResolverDefinition[] = [
   { name: "ServiHosting Networks S.L.", ip: "84.236.142.130" },
   { name: "Universitaet Leipzig", ip: "139.18.25.33" },
   { name: "Universidad LatinoAmericana S.C.", ip: "200.33.3.123" },
+  { name: "Swisscom AG", ip: "195.186.1.111" },
+  { name: "NTT", ip: "118.3.227.163" }
 ];
 
 const RECORD_TYPES: Record<string, RecordType> = {
@@ -97,38 +99,68 @@ async function removeResolver(name: string | undefined): Promise<void> {
   console.log(`Résolveur \"${name}\" supprimé.`);
 }
 
-function printTable(headers: string[], rows: string[][]): void {
-  const widths = headers.map((header, column) => Math.max(header.length, ...rows.map((row) => row[column].length)));
-  const separator = `+-${widths.map((width) => "-".repeat(width)).join("-+-")}-+`;
-  const formatRow = (row: string[]) => `| ${row.map((cell, column) => cell.padEnd(widths[column])).join(" | ")} |`;
+function wrapCell(value: string, width: number): string[] {
+  if (value.length <= width) return [value];
+  const words = value.split(" ");
+  const lines: string[] = [];
+  let line = "";
+  for (const word of words) {
+    if (!line) line = word;
+    else if (line.length + word.length + 1 <= width) line += ` ${word}`;
+    else { lines.push(line); line = word; }
+  }
+  if (line) lines.push(line);
+  return lines.flatMap((item) => item.length <= width
+    ? [item]
+    : Array.from({ length: Math.ceil(item.length / width) }, (_, index) => item.slice(index * width, (index + 1) * width)));
+}
 
-  console.log(separator);
-  console.log(formatRow(headers));
-  console.log(separator);
-  for (const row of rows) console.log(formatRow(row));
-  console.log(separator);
+function formatResponse(result: unknown): string {
+  if (Array.isArray(result)) {
+    return result.map((value) => typeof value === "string" ? value : JSON.stringify(value)).join(", ");
+  }
+  return JSON.stringify(result);
+}
+
+function printTable(headers: string[], rows: string[][]): void {
+  const responseWidth = Math.max(24, Math.min(52, (process.stdout.columns ?? 120) - 82));
+  const columnLimits = [34, 15, 10, 10, responseWidth];
+  const widths = headers.map((header, column) => Math.min(columnLimits[column], Math.max(header.length, ...rows.map((row) => row[column].length))));
+  const border = (left: string, middle: string, right: string) => `${left}${widths.map((width) => "─".repeat(width + 2)).join(middle)}${right}`;
+  const formatLine = (cells: string[]) => `│ ${cells.map((cell, column) => cell.padEnd(widths[column])).join(" │ ")} │`;
+
+  console.log(border("╭", "┬", "╮"));
+  console.log(formatLine(headers));
+  console.log(border("├", "┼", "┤"));
+  for (const row of rows) {
+    const cells = row.map((cell, column) => wrapCell(cell, widths[column]));
+    const height = Math.max(...cells.map((cell) => cell.length));
+    for (let line = 0; line < height; line++) console.log(formatLine(cells.map((cell) => cell[line] ?? "")));
+  }
+  console.log(border("╰", "┴", "╯"));
 }
 
 async function lookup(domain: string, recordType: string): Promise<void> {
   const method = RECORD_TYPES[recordType.toUpperCase()];
   if (!method) { console.error(`Type DNS non pris en charge : ${recordType}`); process.exitCode = 1; return; }
   const resolvers = [...DEFAULT_RESOLVERS, ...await customResolvers()];
-  console.log(`Test ${recordType.toUpperCase()} pour ${domain}\n`);
+  console.log(`\nRésolution DNS · ${recordType.toUpperCase()} · ${domain}`);
+  console.log(`${resolvers.length} résolveur(s) interrogé(s)\n`);
   const results = await Promise.all(resolvers.map(async ({ name, ip }): Promise<LookupResult> => {
     const resolver = new Resolver();
     resolver.setServers([ip]);
     const startedAt = performance.now();
     try {
       const result = await resolver[method](domain);
-      return { name, ip, elapsed: Math.round(performance.now() - startedAt), status: "OK", response: JSON.stringify(result) };
+      return { name, ip, elapsed: Math.round(performance.now() - startedAt), status: "✓ OK", response: formatResponse(result) };
     } catch (error: unknown) {
       const message = error instanceof Error ? error.message : "erreur inconnue";
       process.exitCode = 2;
-      return { name, ip, elapsed: Math.round(performance.now() - startedAt), status: "ERREUR", response: message };
+      return { name, ip, elapsed: Math.round(performance.now() - startedAt), status: "✗ Échec", response: message };
     }
   }));
   printTable(
-    ["Résolveur", "IP", "Délai", "Statut", "Réponse"],
+    ["Résolveur", "IP", "Délai", "Statut", "Réponse DNS"],
     results.map(({ name, ip, elapsed, status, response }) => [name, ip, `${elapsed} ms`, status, response]),
   );
 }
