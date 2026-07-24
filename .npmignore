@@ -1,0 +1,20 @@
+# Source and development files
+src/
+.github/
+.agents/
+.codex/
+.pnpm-store/
+node_modules/
+
+# Tooling and local configuration
+tsconfig.json
+pnpm-lock.yaml
+package-lock.json
+.npmrc
+.gitignore
+.gitattributes
+.editorconfig
+
+# Local artifacts
+*.tgz
+*.log

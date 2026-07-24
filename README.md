@@ -1,11 +1,17 @@
-# dns-check
-
-A command-line tool that compares a DNS record across multiple resolvers.
+<div align="center">
+  <div>
+    <h1 align="center">@mbstudio/dns-check</h1>
+  </div>
+	<p>A command-line tool that compares a DNS record across multiple resolvers.</p>
+	<a href="https://www.npmjs.com/package/@mbstudio/dns-check"><img src="https://img.shields.io/npm/v/@mbstudio/dns-check?style=flat&colorA=444&colorB=199dda" alt="Current version"></a>
+	<a href="https://www.npmjs.com/package/@mbstudio/dns-check?activeTab=versions"><img src="https://img.shields.io/npm/dm/@mbstudio/dns-check.svg?style=flat&colorA=444&colorB=8abe2f" alt="Downloads"></a>
+	<a href="https://github.com/mbstdio/dns-check"><img src="https://img.shields.io/github/stars/mbstdio/dns-check?style=flat&colorA=444&colorB=efce07" alt="Stars"></a>
+</div>
 
 ## Installation
 
 ```bash
-npm install --global dns-check
+npm install --global @mbstudio/dns-check
 ```
 
 ## Usage
@@ -47,7 +53,18 @@ dns-check remove Quad9
 ```bash
 npm install
 npm run build
+npm run release:check
+```
+
+## Publish to npm
+
+The package is configured to publish publicly under the `@mbstudio` scope. After
+authenticating to the npm account that owns that scope, publish it with:
+
+```bash
+npm login
 npm publish
 ```
 
-`prepublishOnly` automatically compiles the project before an npm publish.
+`prepack` and `prepublishOnly` compile the project before packaging and
+publishing. `publishConfig.access` ensures that this scoped package is public.

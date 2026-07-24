@@ -1,29 +1,50 @@
 {
-  "name": "dns-check",
-  "version": "1.0.0",
-  "description": "Compare DNS records across multiple resolvers from the terminal.",
-  "license": "MIT",
-  "type": "module",
-  "bin": {
-    "dns-check": "./dist/index.js"
-  },
-  "files": [
-    "dist",
-    "README.md",
-    "LICENSE"
-  ],
-  "scripts": {
-    "build": "tsc",
-    "start": "node dist/index.js",
-    "dev": "tsx src/index.ts",
-    "prepublishOnly": "npm run build"
-  },
-  "engines": {
-    "node": ">=18"
-  },
-  "devDependencies": {
-    "@types/node": "^22.15.3",
-    "tsx": "^4.19.3",
-    "typescript": "^5.8.3"
-  }
+	"name": "@mbstudio/dns-check",
+	"version": "1.0.0",
+	"description": "Compare DNS records across multiple resolvers from the terminal.",
+	"keywords": [
+		"dns",
+		"dns-check",
+		"dns-propagation",
+		"cli",
+		"network"
+	],
+	"author": "Killian Tornese (@dodo021)",
+	"license": "MIT",
+	"repository": {
+		"type": "git",
+		"url": "git+https://github.com/mbstdio/dns-check.git"
+	},
+	"bugs": {
+		"url": "https://github.com/mbstdio/dns-check/issues"
+	},
+	"homepage": "https://github.com/mbstdio/dns-check#readme",
+	"type": "module",
+	"bin": {
+		"dns-check": "./dist/index.js"
+	},
+	"files": [
+		"dist",
+		"README.md",
+		"LICENSE"
+	],
+	"scripts": {
+		"build": "tsc",
+		"start": "node dist/index.js",
+		"dev": "tsx src/index.ts",
+		"prepack": "npm run build",
+		"prepublishOnly": "npm run build",
+		"release:check": "npm pack --dry-run"
+	},
+	"publishConfig": {
+		"access": "public"
+	},
+	"engines": {
+		"node": ">=18"
+	},
+	"devDependencies": {
+		"@types/node": "^22.15.3",
+		"tsx": "^4.19.3",
+		"typescript": "^5.8.3"
+	}
 }
