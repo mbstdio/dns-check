@@ -1,6 +1,6 @@
 # dns-check
 
-Un outil en ligne de commande qui compare une entrée DNS chez plusieurs résolveurs.
+A command-line tool that compares a DNS record across multiple resolvers.
 
 ## Installation
 
@@ -8,41 +8,41 @@ Un outil en ligne de commande qui compare une entrée DNS chez plusieurs résolv
 npm install --global dns-check
 ```
 
-## Utilisation
+## Usage
 
 ```bash
-# Le type A est utilisé par défaut
+# The A record type is used by default
 dns-check example.com
 
-# Interroger un autre type d'entrée
+# Query a different record type
 dns-check example.com -t NS
 dns-check example.com --type MX
 
-# Vérifier qu'une valeur précise est retournée
+# Check whether a specific value is returned
 dns-check example.com --expected 93.184.216.34
 dns-check example.com -t NS -e a.iana-servers.net
 ```
 
-Avec `-e` ou `--expected`, la colonne **Statut** affiche `✓ OK` si la valeur attendue est présente dans la réponse du résolveur, ou `✗ NON` dans le cas contraire. Les erreurs de résolution restent affichées comme `✗ Échec`.
+With `-e` or `--expected`, the **Status** column shows `✓ OK` when the expected value is present in the resolver response, or `✗ NO` otherwise. Resolution errors remain displayed as `✗ Failed`.
 
-Par défaut, les résolveurs publics suivants sont interrogés : Google (`8.8.8.8`), Cloudflare (`1.1.1.1`), Quad9 (`9.9.9.9`), OpenDNS (`208.67.222.222`), AdGuard DNS (`94.140.14.14`), CleanBrowsing (`185.228.168.9`), Completel - SAS (`83.145.86.7`), ServiHosting Networks S.L. (`84.236.142.130`), Universitaet Leipzig (`139.18.25.33`) et Universidad LatinoAmericana S.C. (`200.33.3.123`).
+By default, the following public resolvers are queried: Google (`8.8.8.8`), Cloudflare (`1.1.1.1`), Quad9 (`9.9.9.9`), OpenDNS (`208.67.222.222`), AdGuard DNS (`94.140.14.14`), CleanBrowsing (`185.228.168.9`), Completel - SAS (`83.145.86.7`), ServiHosting Networks S.L. (`84.236.142.130`), Universitaet Leipzig (`139.18.25.33`), Universidad LatinoAmericana S.C. (`200.33.3.123`), Swisscom AG (`195.186.1.111`), and NTT (`118.3.227.163`).
 
-Certains de ces résolveurs appliquent une protection contre les domaines malveillants ou du filtrage de contenu. Un résultat différent peut donc être intentionnel, et pas nécessairement un problème de propagation DNS.
+Some of these resolvers apply protection against malicious domains or content filtering. A different result may therefore be intentional, rather than a DNS propagation issue.
 
-## Ajouter un résolveur
+## Add a resolver
 
 ```bash
 dns-check add -ip 9.9.9.9 -name Quad9
 ```
 
-Les résolveurs ajoutés sont enregistrés dans le répertoire de configuration de votre système et seront inclus dans les prochains tests.
+Added resolvers are saved in your system configuration directory and included in future checks.
 
 ```bash
 dns-check resolvers
 dns-check remove Quad9
 ```
 
-## Développement et publication
+## Development and publishing
 
 ```bash
 npm install
@@ -50,4 +50,4 @@ npm run build
 npm publish
 ```
 
-`prepublishOnly` compile automatiquement le projet avant une publication npm.
+`prepublishOnly` automatically compiles the project before an npm publish.

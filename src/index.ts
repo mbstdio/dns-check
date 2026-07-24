@@ -8,7 +8,7 @@ import { isIP } from "node:net";
 
 type RecordType = keyof Pick<Resolver, "resolve4" | "resolve6" | "resolveCaa" | "resolveCname" | "resolveMx" | "resolveNaptr" | "resolveNs" | "resolvePtr" | "resolveSoa" | "resolveSrv" | "resolveTxt">;
 type ResolverDefinition = { name: string; ip: string };
-type LookupResult = ResolverDefinition & { elapsed: number; status: "✓ OK" | "✗ NON" | "✗ Échec"; response: string };
+type LookupResult = ResolverDefinition & { elapsed: number; status: "✓ OK" | "✗ NO" | "✗ Failed"; response: string };
 
 const DEFAULT_RESOLVERS: ResolverDefinition[] = [
   { name: "Google", ip: "8.8.8.8" },
@@ -41,11 +41,11 @@ function configPath(): string {
 async function customResolvers(): Promise<ResolverDefinition[]> {
   try {
     const parsed: unknown = JSON.parse(await fs.readFile(configPath(), "utf8"));
-    if (!Array.isArray(parsed)) throw new Error("format invalide");
+    if (!Array.isArray(parsed)) throw new Error("invalid format");
     return parsed.filter((value): value is ResolverDefinition => Boolean(value) && typeof value.name === "string" && typeof value.ip === "string");
   } catch (error: unknown) {
     if ((error as NodeJS.ErrnoException).code === "ENOENT") return [];
-    console.error(`Attention : impossible de lire les résolveurs personnalisés (${error instanceof Error ? error.message : "erreur inconnue"}).`);
+    console.error(`Warning: unable to read custom resolvers (${error instanceof Error ? error.message : "unknown error"}).`);
     return [];
   }
 }
@@ -62,20 +62,20 @@ function valueAfter(args: string[], flag: string): string | undefined {
 
 function usage(): void {
   console.log(`Usage:
-  dns-check <domaine> [-t TYPE] [-e VALEUR_ATTENDUE]
-  dns-check add -ip <adresse> -name <nom>
+  dns-check <domain> [-t TYPE] [-e EXPECTED_VALUE]
+  dns-check add -ip <IP_ADDRESS> -name <name>
   dns-check resolvers
-  dns-check remove <nom>
+  dns-check remove <name>
 
-Types : ${Object.keys(RECORD_TYPES).join(", ")} (A par défaut)
-  -e, --expected  Valeur qui doit être présente dans la réponse DNS`);
+Record types: ${Object.keys(RECORD_TYPES).join(", ")} (A by default)
+  -e, --expected  Value that must be present in the DNS response`);
 }
 
 async function addResolver(args: string[]): Promise<void> {
   const ip = valueAfter(args, "-ip") ?? valueAfter(args, "--ip");
   const name = valueAfter(args, "-name") ?? valueAfter(args, "--name");
   if (!ip || !name || isIP(ip) === 0) {
-    console.error("Usage : dns-check add -ip <adresse IP> -name <nom>");
+    console.error("Usage: dns-check add -ip <IP address> -name <name>");
     process.exitCode = 1;
     return;
   }
@@ -84,7 +84,7 @@ async function addResolver(args: string[]): Promise<void> {
   if (existing >= 0) resolvers[existing] = { name, ip };
   else resolvers.push({ name, ip });
   await saveCustomResolvers(resolvers);
-  console.log(`Résolveur \"${name}\" (${ip}) enregistré.`);
+  console.log(`Resolver \"${name}\" (${ip}) saved.`);
 }
 
 async function listResolvers(): Promise<void> {
@@ -92,12 +92,12 @@ async function listResolvers(): Promise<void> {
 }
 
 async function removeResolver(name: string | undefined): Promise<void> {
-  if (!name) { console.error("Usage : dns-check remove <nom>"); process.exitCode = 1; return; }
+  if (!name) { console.error("Usage: dns-check remove <name>"); process.exitCode = 1; return; }
   const resolvers = await customResolvers();
   const retained = resolvers.filter((resolver) => resolver.name.toLowerCase() !== name.toLowerCase());
-  if (retained.length === resolvers.length) { console.error(`Aucun résolveur personnalisé nommé \"${name}\".`); process.exitCode = 1; return; }
+  if (retained.length === resolvers.length) { console.error(`No custom resolver named \"${name}\".`); process.exitCode = 1; return; }
   await saveCustomResolvers(retained);
-  console.log(`Résolveur \"${name}\" supprimé.`);
+  console.log(`Resolver \"${name}\" removed.`);
 }
 
 function wrapCell(value: string, width: number): string[] {
@@ -155,11 +155,11 @@ function printTableRow(layout: ReturnType<typeof tableLayout>, row: string[]): v
 
 async function lookup(domain: string, recordType: string, expectedValue?: string): Promise<void> {
   const method = RECORD_TYPES[recordType.toUpperCase()];
-  if (!method) { console.error(`Type DNS non pris en charge : ${recordType}`); process.exitCode = 1; return; }
+  if (!method) { console.error(`Unsupported DNS record type: ${recordType}`); process.exitCode = 1; return; }
   const resolvers = [...DEFAULT_RESOLVERS, ...await customResolvers()];
-  console.log(`\nRésolution DNS · ${recordType.toUpperCase()} · ${domain}${expectedValue === undefined ? "" : ` · valeur attendue : ${expectedValue}`}`);
-  console.log(`${resolvers.length} résolveur(s) interrogé(s)\n`);
-  const layout = printTableHeader(["Résolveur", "IP", "Délai", "Statut", "Réponse DNS"]);
+  console.log(`\nDNS lookup · ${recordType.toUpperCase()} · ${domain}${expectedValue === undefined ? "" : ` · expected value: ${expectedValue}`}`);
+  console.log(`${resolvers.length} resolver(s) queried\n`);
+  const layout = printTableHeader(["Resolver", "IP", "Latency", "Status", "DNS response"]);
   await Promise.all(resolvers.map(async ({ name, ip }): Promise<LookupResult> => {
     const resolver = new Resolver();
     resolver.setServers([ip]);
@@ -170,13 +170,13 @@ async function lookup(domain: string, recordType: string, expectedValue?: string
         name,
         ip,
         elapsed: Math.round(performance.now() - startedAt),
-        status: expectedValue === undefined || matchesExpectedValue(result, expectedValue) ? "✓ OK" : "✗ NON",
+        status: expectedValue === undefined || matchesExpectedValue(result, expectedValue) ? "✓ OK" : "✗ NO",
         response: formatResponse(result),
       };
     } catch (error: unknown) {
-      const message = error instanceof Error ? error.message : "erreur inconnue";
+      const message = error instanceof Error ? error.message : "unknown error";
       process.exitCode = 2;
-      return { name, ip, elapsed: Math.round(performance.now() - startedAt), status: "✗ Échec", response: message };
+      return { name, ip, elapsed: Math.round(performance.now() - startedAt), status: "✗ Failed", response: message };
     }
   }).map((promise) => promise.then((result) => {
     printTableRow(layout, [result.name, result.ip, `${result.elapsed} ms`, result.status, result.response]);
@@ -199,6 +199,6 @@ async function main(): Promise<void> {
 }
 
 main().catch((error: unknown) => {
-  console.error(error instanceof Error ? error.message : "Erreur inattendue");
+  console.error(error instanceof Error ? error.message : "Unexpected error");
   process.exitCode = 1;
 });
