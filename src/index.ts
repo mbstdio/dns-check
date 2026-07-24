@@ -8,7 +8,7 @@ import { isIP } from "node:net";
 
 type RecordType = keyof Pick<Resolver, "resolve4" | "resolve6" | "resolveCaa" | "resolveCname" | "resolveMx" | "resolveNaptr" | "resolveNs" | "resolvePtr" | "resolveSoa" | "resolveSrv" | "resolveTxt">;
 type ResolverDefinition = { name: string; ip: string };
-type LookupResult = ResolverDefinition & { elapsed: number; status: "✓ OK" | "✗ Échec"; response: string };
+type LookupResult = ResolverDefinition & { elapsed: number; status: "✓ OK" | "✗ NON" | "✗ Échec"; response: string };
 
 const DEFAULT_RESOLVERS: ResolverDefinition[] = [
   { name: "Google", ip: "8.8.8.8" },
@@ -62,12 +62,13 @@ function valueAfter(args: string[], flag: string): string | undefined {
 
 function usage(): void {
   console.log(`Usage:
-  dns-check <domaine> [-t TYPE]
+  dns-check <domaine> [-t TYPE] [-e VALEUR_ATTENDUE]
   dns-check add -ip <adresse> -name <nom>
   dns-check resolvers
   dns-check remove <nom>
 
-Types : ${Object.keys(RECORD_TYPES).join(", ")} (A par défaut)`);
+Types : ${Object.keys(RECORD_TYPES).join(", ")} (A par défaut)
+  -e, --expected  Valeur qui doit être présente dans la réponse DNS`);
 }
 
 async function addResolver(args: string[]): Promise<void> {
@@ -115,11 +116,18 @@ function wrapCell(value: string, width: number): string[] {
     : Array.from({ length: Math.ceil(item.length / width) }, (_, index) => item.slice(index * width, (index + 1) * width)));
 }
 
+function formatDnsValue(value: unknown): string {
+  return typeof value === "string" ? value : JSON.stringify(value);
+}
+
 function formatResponse(result: unknown): string {
-  if (Array.isArray(result)) {
-    return result.map((value) => typeof value === "string" ? value : JSON.stringify(value)).join(", ");
-  }
-  return JSON.stringify(result);
+  if (Array.isArray(result)) return result.map(formatDnsValue).join(", ");
+  return formatDnsValue(result);
+}
+
+function matchesExpectedValue(result: unknown, expectedValue: string): boolean {
+  const values = Array.isArray(result) ? result : [result];
+  return values.some((value) => formatDnsValue(value) === expectedValue);
 }
 
 function printTable(headers: string[], rows: string[][]): void {
@@ -140,11 +148,11 @@ function printTable(headers: string[], rows: string[][]): void {
   console.log(border("╰", "┴", "╯"));
 }
 
-async function lookup(domain: string, recordType: string): Promise<void> {
+async function lookup(domain: string, recordType: string, expectedValue?: string): Promise<void> {
   const method = RECORD_TYPES[recordType.toUpperCase()];
   if (!method) { console.error(`Type DNS non pris en charge : ${recordType}`); process.exitCode = 1; return; }
   const resolvers = [...DEFAULT_RESOLVERS, ...await customResolvers()];
-  console.log(`\nRésolution DNS · ${recordType.toUpperCase()} · ${domain}`);
+  console.log(`\nRésolution DNS · ${recordType.toUpperCase()} · ${domain}${expectedValue === undefined ? "" : ` · valeur attendue : ${expectedValue}`}`);
   console.log(`${resolvers.length} résolveur(s) interrogé(s)\n`);
   const results = await Promise.all(resolvers.map(async ({ name, ip }): Promise<LookupResult> => {
     const resolver = new Resolver();
@@ -152,7 +160,13 @@ async function lookup(domain: string, recordType: string): Promise<void> {
     const startedAt = performance.now();
     try {
       const result = await resolver[method](domain);
-      return { name, ip, elapsed: Math.round(performance.now() - startedAt), status: "✓ OK", response: formatResponse(result) };
+      return {
+        name,
+        ip,
+        elapsed: Math.round(performance.now() - startedAt),
+        status: expectedValue === undefined || matchesExpectedValue(result, expectedValue) ? "✓ OK" : "✗ NON",
+        response: formatResponse(result),
+      };
     } catch (error: unknown) {
       const message = error instanceof Error ? error.message : "erreur inconnue";
       process.exitCode = 2;
@@ -174,7 +188,8 @@ async function main(): Promise<void> {
   if (command === "remove") return removeResolver(args[1]);
   if (command.startsWith("-")) { usage(); process.exitCode = 1; return; }
   const recordType = valueAfter(args, "-t") ?? valueAfter(args, "--type") ?? "A";
-  await lookup(command, recordType);
+  const expectedValue = valueAfter(args, "-e") ?? valueAfter(args, "--expected");
+  await lookup(command, recordType, expectedValue);
 }
 
 main().catch((error: unknown) => {
